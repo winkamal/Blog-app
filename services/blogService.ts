@@ -1,118 +1,45 @@
-import { db, storage } from './firebase';
-import { 
-  collection, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc,
-  query,
-  orderBy,
-  Timestamp,
-} from 'firebase/firestore';
-import { 
-  ref, 
-  uploadBytes, 
-  getDownloadURL,
-  deleteObject
-} from 'firebase/storage';
 import { BlogPost } from '../types';
 
-const postsCollectionRef = collection(db, 'posts');
+// This implementation uses a free, no-auth key-value store (kvdb.io) for demonstration.
+// This makes the blog data persistent and globally accessible.
+// A unique bucket and key are used to store the blog's data.
+const BUCKET_URL = 'https://kvdb.io/AS4hJg28W2LhY7b8X9cK3d/vt-blog-posts';
 
-// Convert Firestore timestamp to a readable date string
-const formatDate = (timestamp: Timestamp) => {
-    if (!timestamp) return new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    return timestamp.toDate().toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-};
-
-const formatCommentDate = (timestamp: any) => {
-    if (timestamp instanceof Timestamp) {
-        return timestamp.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-    // Fallback for potentially non-timestamp dates in old data
-    return new Date(timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-};
-
-
-// FETCH all posts from Firestore
 export const getPosts = async (): Promise<BlogPost[]> => {
   try {
-    const q = query(postsCollectionRef, orderBy('createdAt', 'desc'));
-    const data = await getDocs(q);
-    const posts = data.docs.map((doc) => {
-        const docData = doc.data();
-        return {
-            ...docData,
-            id: doc.id,
-            date: formatDate(docData.createdAt),
-            comments: docData.comments?.map((c: any) => ({
-                ...c,
-                date: formatCommentDate(c.createdAt),
-            })) || [],
-        } as BlogPost;
-    });
-    return posts;
+    const response = await fetch(BUCKET_URL);
+    if (response.status === 404) {
+      // If the key doesn't exist, it's a new blog. Return an empty array.
+      return [];
+    }
+    if (!response.ok) {
+      throw new Error(`Failed to fetch posts: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
   } catch (error) {
-    console.error("Error fetching posts from Firestore:", error);
-    alert("Could not fetch blog posts. Please check your Firebase setup and security rules. Reads for the 'posts' collection should be public.");
+    console.error("Error fetching posts:", error);
+    // Return an empty array to prevent the app from crashing on network errors.
     return [];
   }
 };
 
-// UPLOAD a file to Firebase Storage
-export const uploadFile = async (file: File): Promise<string> => {
-    if (!file) throw new Error("No file provided for upload.");
-    const fileRef = ref(storage, `media/${Date.now()}_${file.name}`);
-    await uploadBytes(fileRef, file);
-    const downloadURL = await getDownloadURL(fileRef);
-    return downloadURL;
-};
+export const savePosts = async (posts: BlogPost[]): Promise<void> => {
+  try {
+    const response = await fetch(BUCKET_URL, {
+      method: 'POST', // Using POST to create or update the data blob.
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(posts),
+    });
 
-// DELETE a file from Firebase Storage from its URL
-const deleteFileByUrl = async (url: string) => {
-    if (!url || !url.startsWith('https')) return;
-    try {
-        const fileRef = ref(storage, url);
-        await deleteObject(fileRef);
-    } catch (error: any) {
-        if (error.code !== 'storage/object-not-found') {
-            console.error("Error deleting file from storage:", error);
-        }
+    if (!response.ok) {
+      throw new Error(`Failed to save posts: ${response.statusText}`);
     }
-}
-
-// ADD a new post to Firestore
-export const addPost = async (postData: Partial<Omit<BlogPost, 'id' | 'date' | 'comments'>>): Promise<string> => {
-    const newPost = {
-        ...postData,
-        createdAt: Timestamp.now(),
-        comments: [],
-    };
-    const docRef = await addDoc(postsCollectionRef, newPost);
-    return docRef.id;
-};
-
-// UPDATE an existing post in Firestore
-export const updatePost = async (id: string, postData: Partial<BlogPost>): Promise<void> => {
-    const postDoc = doc(db, 'posts', id);
-    const updateData = { ...postData };
-    delete updateData.id; 
-    await updateDoc(postDoc, updateData);
-};
-
-// DELETE a post from Firestore and its associated media from Storage
-export const deletePost = async (post: BlogPost): Promise<void> => {
-    if (post.imageUrl) {
-        await deleteFileByUrl(post.imageUrl);
-    }
-    if (post.audioUrl) {
-        await deleteFileByUrl(post.audioUrl);
-    }
-    const postDoc = doc(db, 'posts', post.id);
-    await deleteDoc(postDoc);
+  } catch (error) {
+    console.error("Error saving posts:", error);
+    // Re-throw the error to be handled by the caller, e.g., to show a UI notification.
+    throw error;
+  }
 };

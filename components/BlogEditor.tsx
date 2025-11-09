@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { BlogPost } from '../types';
 import { generateHashtags, checkSpellingAndGrammar } from '../services/geminiService';
 import { SparklesIcon, SpellcheckIcon } from './Icons';
-import { uploadFile } from '../services/blogService';
 
 interface BlogEditorProps {
     onSave: (postData: { title: string; content: string; hashtags: string[]; imageUrl?: string; audioUrl?: string }, id?: string) => void;
@@ -22,15 +21,10 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ onSave, onCancel, postToEdit })
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [hashtags, setHashtags] = useState('');
-    
     const [imagePreview, setImagePreview] = useState<string | undefined>();
     const [audioPreview, setAudioPreview] = useState<string | undefined>();
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [audioFile, setAudioFile] = useState<File | null>(null);
-
     const [isGenerating, setIsGenerating] = useState(false);
     const [isCheckingSpelling, setIsCheckingSpelling] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (postToEdit) {
@@ -42,17 +36,14 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ onSave, onCancel, postToEdit })
         }
     }, [postToEdit]);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'audio') => {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setPreview: (url: string) => void) => {
         const file = e.target.files?.[0];
         if (file) {
-            const previewUrl = URL.createObjectURL(file);
-            if (type === 'image') {
-                setImageFile(file);
-                setImagePreview(previewUrl);
-            } else {
-                setAudioFile(file);
-                setAudioPreview(previewUrl);
-            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
         }
     };
 
@@ -90,34 +81,16 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ onSave, onCancel, postToEdit })
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setIsSaving(true);
-
-        try {
-            let imageUrl = postToEdit?.imageUrl;
-            if (imageFile) {
-                imageUrl = await uploadFile(imageFile);
-            }
-
-            let audioUrl = postToEdit?.audioUrl;
-            if (audioFile) {
-                audioUrl = await uploadFile(audioFile);
-            }
-
-            const postData = {
-                title,
-                content,
-                hashtags: hashtags.split(',').map(tag => tag.trim().replace(/^#/, '')).filter(Boolean).map(tag => `#${tag}`),
-                imageUrl,
-                audioUrl,
-            };
-            onSave(postData, postToEdit?.id);
-        } catch (error) {
-            console.error("Failed to save post:", error);
-            alert("Error saving post. Check the console for details and verify your Firebase Storage rules.");
-            setIsSaving(false);
-        }
+        const postData = {
+            title,
+            content,
+            hashtags: hashtags.split(',').map(tag => tag.trim().replace(/^#/, '')).filter(Boolean).map(tag => `#${tag}`),
+            imageUrl: imagePreview,
+            audioUrl: audioPreview,
+        };
+        onSave(postData, postToEdit?.id);
     };
 
     return (
@@ -148,12 +121,12 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ onSave, onCancel, postToEdit })
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                          <label htmlFor="image" className="block text-sm font-medium text-gradient">Cover Image</label>
-                         <input type="file" id="image" accept="image/*" onChange={(e) => handleFileChange(e, 'image')} className="mt-1 block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-200 dark:file:bg-slate-700 file:text-teal-700 dark:file:text-teal-300 hover:file:bg-gray-300 dark:hover:file:bg-slate-600 transition"/>
+                         <input type="file" id="image" accept="image/*" onChange={(e) => handleFileChange(e, setImagePreview)} className="mt-1 block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-200 dark:file:bg-slate-700 file:text-teal-700 dark:file:text-teal-300 hover:file:bg-gray-300 dark:hover:file:bg-slate-600 transition"/>
                          {imagePreview && <img src={imagePreview} alt="Preview" className="mt-4 rounded-lg object-cover h-48 w-full"/>}
                     </div>
                     <div>
                          <label htmlFor="audio" className="block text-sm font-medium text-gradient">Background Music</label>
-                         <input type="file" id="audio" accept="audio/*" onChange={(e) => handleFileChange(e, 'audio')} className="mt-1 block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-200 dark:file:bg-slate-700 file:text-rose-700 dark:file:text-rose-300 hover:file:bg-gray-300 dark:hover:file:bg-slate-600 transition"/>
+                         <input type="file" id="audio" accept="audio/*" onChange={(e) => handleFileChange(e, setAudioPreview)} className="mt-1 block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-200 dark:file:bg-slate-700 file:text-rose-700 dark:file:text-rose-300 hover:file:bg-gray-300 dark:hover:file:bg-slate-600 transition"/>
                          {audioPreview && <audio controls src={audioPreview} className="mt-4 w-full"/>}
                     </div>
                 </div>
@@ -168,9 +141,7 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ onSave, onCancel, postToEdit })
                 </div>
                 <div className="flex justify-end space-x-4">
                     <button type="button" onClick={onCancel} className="px-6 py-2 border border-gray-300 dark:border-slate-600 rounded-lg shadow-sm text-sm font-medium text-gray-800 dark:text-gray-200 bg-white dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition">Cancel</button>
-                    <button type="submit" disabled={isSaving} className="px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-rose-500 hover:bg-rose-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 transition disabled:bg-gray-400 dark:disabled:bg-gray-600">
-                        {isSaving ? 'Publishing...' : 'Publish'}
-                    </button>
+                    <button type="submit" className="px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-rose-500 hover:bg-rose-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 transition">Publish</button>
                 </div>
             </form>
         </div>
