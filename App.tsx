@@ -5,9 +5,10 @@ import BlogPostView from './components/BlogPostView';
 import BlogEditor from './components/BlogEditor';
 import Login, { Credentials } from './components/Login';
 import AdminPanel from './components/AdminPanel';
-import { useMockData } from './hooks/useMockData';
+import { getPosts, addPost, updatePost, deletePost } from './services/blogService';
 import Chatbot from './components/Chatbot';
 import AboutMeView from './components/AboutMeView';
+import { Timestamp } from 'firebase/firestore';
 
 type View = 'list' | 'post' | 'create' | 'edit' | 'about';
 type Theme = 'light' | 'dark';
@@ -18,7 +19,8 @@ interface ThemeColors {
 }
 
 const App: React.FC = () => {
-    const { posts, setPosts } = useMockData();
+    const [posts, setPosts] = useState<BlogPost[]>([]);
+    const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
     const [view, setView] = useState<View>('list');
     const [previousView, setPreviousView] = useState<View>('list');
     const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
@@ -47,6 +49,22 @@ const App: React.FC = () => {
             dark: { start: '#a5b4fc', end: '#f9a8d4' }
         };
     });
+    
+    const refreshPosts = async () => {
+        setIsLoadingData(true);
+        try {
+            const fetchedPosts = await getPosts();
+            setPosts(fetchedPosts);
+        } catch(e) {
+            console.error("Failed to refresh posts", e);
+        } finally {
+            setIsLoadingData(false);
+        }
+    };
+
+    useEffect(() => {
+        refreshPosts();
+    }, []);
 
     useEffect(() => {
         const root = window.document.documentElement;
@@ -109,11 +127,20 @@ const App: React.FC = () => {
         setView('edit');
     };
 
-    const handleDeletePost = (id: string) => {
+    const handleDeletePost = async (id: string) => {
         if (window.confirm('Are you sure you want to delete this post?')) {
-            setPosts(posts.filter(p => p.id !== id));
-            setView('list');
-            setSelectedPostId(null);
+            const postToDelete = posts.find(p => p.id === id);
+            if (postToDelete) {
+                try {
+                    await deletePost(postToDelete);
+                    await refreshPosts();
+                    setView('list');
+                    setSelectedPostId(null);
+                } catch (error) {
+                    console.error("Failed to delete post:", error);
+                    alert("Could not delete post. Check console and Firebase rules.");
+                }
+            }
         }
     };
 
@@ -141,52 +168,67 @@ const App: React.FC = () => {
         setView('list');
     };
 
-    const handleSavePost = (postData: { title: string; content: string; hashtags: string[]; imageUrl?: string; audioUrl?: string }, id?: string) => {
-        if (id) { // Editing existing post
-            const updatedPosts = posts.map(p => p.id === id ? { ...p, ...postData } : p);
-            setPosts(updatedPosts);
+    const handleSavePost = async (postData: { title: string; content: string; hashtags: string[]; imageUrl?: string; audioUrl?: string }, id?: string) => {
+        try {
+            if (id) { // Editing existing post
+                const originalPost = posts.find(p => p.id === id);
+                if (!originalPost) throw new Error("Post not found for editing");
+                
+                const updatedPostData = { ...originalPost, ...postData };
+                await updatePost(id, updatedPostData);
+                setSelectedPostId(id);
+            } else { // Creating new post
+                const newPostData = {
+                    ...postData,
+                    author: authorName,
+                };
+                const newId = await addPost(newPostData);
+                setSelectedPostId(newId);
+            }
+            await refreshPosts();
             setView('post');
-            setSelectedPostId(id);
-        } else { // Creating new post
-            const newPost: BlogPost = {
-                id: new Date().toISOString(),
-                author: authorName,
-                date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-                ...postData,
-                comments: [],
-            };
-            const updatedPosts = [newPost, ...posts];
-            setPosts(updatedPosts);
-            setView('post');
-            setSelectedPostId(newPost.id);
+        } catch (error) {
+            console.error("Error saving post:", error);
+            alert("Could not save post. Check your console and Firebase security rules.");
         }
     };
     
-    const handleAddComment = (postId: string, commentData: { author: string; content: string }) => {
+    const handleAddComment = async (postId: string, commentData: { author: string; content: string }) => {
+        const postToUpdate = posts.find(post => post.id === postId);
+        if (!postToUpdate) return;
+    
+        // FIX: The new comment object must match the `Comment` type, including the `date` property.
+        const now = Timestamp.now();
         const newComment: Comment = {
             id: new Date().toISOString(),
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            createdAt: now,
             ...commentData,
+            date: now.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         };
-        const updatedPosts = posts.map(post => {
-            if (post.id === postId) {
-                const existingComments = post.comments || [];
-                return { ...post, comments: [...existingComments, newComment] };
-            }
-            return post;
-        });
-        setPosts(updatedPosts);
+    
+        const updatedComments = [...(postToUpdate.comments || []), newComment];
+        try {
+            await updatePost(postId, { comments: updatedComments });
+            await refreshPosts();
+        } catch(e) {
+            console.error("Failed to add comment", e);
+            alert("Could not add comment. Please try again.");
+        }
     };
 
-    const handleDeleteComment = (postId: string, commentId: string) => {
+    const handleDeleteComment = async (postId: string, commentId: string) => {
         if (!window.confirm('Are you sure you want to delete this comment?')) return;
-        const updatedPosts = posts.map(post => {
-            if (post.id === postId) {
-                return { ...post, comments: post.comments.filter(c => c.id !== commentId) };
-            }
-            return post;
-        });
-        setPosts(updatedPosts);
+        const postToUpdate = posts.find(post => post.id === postId);
+        if (!postToUpdate) return;
+        
+        const updatedComments = postToUpdate.comments.filter(c => c.id !== commentId);
+        try {
+            await updatePost(postId, { comments: updatedComments });
+            await refreshPosts();
+        } catch(e) {
+            console.error("Failed to delete comment", e);
+            alert("Could not delete comment. Please try again.");
+        }
     };
     
     const displayedPosts = useMemo(() => {
@@ -210,6 +252,13 @@ const App: React.FC = () => {
     const currentPost = posts.find(p => p.id === selectedPostId);
 
     const renderMainContent = () => {
+        if (isLoadingData) {
+            return (
+                <div className="flex justify-center items-center h-full glass-card p-8">
+                     <h2 className="text-2xl font-serif text-gradient animate-pulse">Loading posts from the cloud...</h2>
+                </div>
+            )
+        }
         switch (view) {
             case 'create':
                 return <BlogEditor onSave={handleSavePost} onCancel={handleCancelCreate} />;
@@ -219,7 +268,11 @@ const App: React.FC = () => {
                 if (currentPost) {
                     return <BlogPostView post={currentPost} onSelectTag={handleSelectTag} isAuthenticated={isAuthenticated} onEdit={handleEditPost} onDelete={handleDeletePost} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
                 }
-                return <p>Post not found.</p>;
+                // If post is not found after loading, it might have been deleted.
+                return <div className="text-center py-16 glass-card">
+                          <h2 className="text-2xl font-serif text-gradient">Post not found.</h2>
+                          <p className="text-gradient opacity-70 mt-2">It may have been deleted. Please select another post.</p>
+                       </div>;
             case 'about':
                 return <AboutMeView content={aboutMeContent} onBack={handleBack} />;
             case 'list':

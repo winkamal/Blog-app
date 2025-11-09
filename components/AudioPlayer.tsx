@@ -8,7 +8,8 @@ interface AudioPlayerProps {
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ src }) => {
     const audioRef = useRef<HTMLAudioElement>(null);
     const progressBarRef = useRef<HTMLInputElement>(null);
-    const animationRef = useRef<number>();
+    // FIX: Initialize useRef with null to satisfy stricter type checks that might not allow an empty call.
+    const animationRef = useRef<number | null>(null);
 
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
