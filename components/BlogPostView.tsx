@@ -12,9 +12,10 @@ interface BlogPostViewProps {
     onDelete: (id: string) => void;
     onAddComment: (postId: string, commentData: { author: string, content: string }) => void;
     onDeleteComment: (postId: string, commentId: string) => void;
+    isAutoplayEnabled: boolean;
 }
 
-const BlogPostView: React.FC<BlogPostViewProps> = ({ post, onSelectTag, isAuthenticated, onEdit, onDelete, onAddComment, onDeleteComment }) => {
+const BlogPostView: React.FC<BlogPostViewProps> = ({ post, onSelectTag, isAuthenticated, onEdit, onDelete, onAddComment, onDeleteComment, isAutoplayEnabled }) => {
     return (
         <article className="glass-card p-6 sm:p-8 w-full animate-fade-in-up relative hover:shadow-2xl">
             {isAuthenticated && (
@@ -39,7 +40,9 @@ const BlogPostView: React.FC<BlogPostViewProps> = ({ post, onSelectTag, isAuthen
             )}
 
             {post.audioUrl && (
-                <AudioPlayer src={post.audioUrl} />
+                <div className="my-6">
+                    <AudioPlayer src={post.audioUrl} autoPlay={isAutoplayEnabled} />
+                </div>
             )}
             
             <div className="prose prose-lg max-w-none text-gradient leading-relaxed dark:prose-invert" dangerouslySetInnerHTML={{ __html: post.content.replace(/\n/g, '<br />') }} />

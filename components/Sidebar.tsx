@@ -21,17 +21,15 @@ interface SidebarProps {
     onSearchChange: (query: string) => void;
 }
 
-const ThemeToggle: React.FC<{ theme: 'light' | 'dark', toggleTheme: () => void, onOpenSettings: () => void, isAuthenticated: boolean }> = ({ theme, toggleTheme, onOpenSettings, isAuthenticated }) => (
+const ThemeToggle: React.FC<{ theme: 'light' | 'dark', toggleTheme: () => void, onOpenSettings: () => void }> = ({ theme, toggleTheme, onOpenSettings }) => (
     <div className="flex items-center gap-2 p-1 rounded-full bg-white/20 dark:bg-black/20">
-         {isAuthenticated && (
-            <button
-                onClick={onOpenSettings}
-                className="p-2 rounded-full text-gray-700 dark:text-gray-300 hover:bg-white/40 dark:hover:bg-black/40 transition-colors"
-                aria-label="Open Settings"
-            >
-                <SettingsIcon className="w-5 h-5" />
-            </button>
-         )}
+         <button
+            onClick={onOpenSettings}
+            className="p-2 rounded-full text-gray-700 dark:text-gray-300 hover:bg-white/40 dark:hover:bg-black/40 transition-colors"
+            aria-label="Open Settings"
+         >
+            <SettingsIcon className="w-5 h-5" />
+         </button>
         <button
             onClick={toggleTheme}
             className="p-2 rounded-full text-gray-700 dark:text-gray-300 hover:bg-white/40 dark:hover:bg-black/40 transition-colors"
@@ -51,7 +49,7 @@ const Sidebar: React.FC<SidebarProps> = ({ indexPosts, allPosts, blogTitle, onSe
             <div className="glass-card w-full h-full p-6 flex flex-col">
                 <header className="text-center mb-8">
                     <div className="flex justify-end items-center mb-1">
-                       <ThemeToggle theme={theme} toggleTheme={toggleTheme} onOpenSettings={onOpenSettings} isAuthenticated={isAuthenticated} />
+                       <ThemeToggle theme={theme} toggleTheme={toggleTheme} onOpenSettings={onOpenSettings} />
                     </div>
                     <h1 className="text-4xl font-serif font-bold text-gradient cursor-pointer text-center" onClick={() => onSelectTag(null)}>{blogTitle}</h1>
                     <p className="text-sm text-gradient opacity-70 mt-1">Everyday Life Moments</p>

@@ -5,7 +5,7 @@ import BlogPostView from './components/BlogPostView';
 import BlogEditor from './components/BlogEditor';
 import Login, { Credentials } from './components/Login';
 import AdminPanel from './components/AdminPanel';
-import { getPosts, createPost, updatePost, deletePost, addComment, deleteComment } from './services/blogService';
+import { useMockData } from './hooks/useMockData';
 import Chatbot from './components/Chatbot';
 import AboutMeView from './components/AboutMeView';
 
@@ -18,8 +18,7 @@ interface ThemeColors {
 }
 
 const App: React.FC = () => {
-    const [posts, setPosts] = useState<BlogPost[]>([]);
-    const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+    const { posts, setPosts } = useMockData();
     const [view, setView] = useState<View>('list');
     const [previousView, setPreviousView] = useState<View>('list');
     const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
@@ -48,23 +47,7 @@ const App: React.FC = () => {
             dark: { start: '#a5b4fc', end: '#f9a8d4' }
         };
     });
-    
-    useEffect(() => {
-        const loadInitialData = async () => {
-            setIsLoadingData(true);
-            try {
-                const fetchedPosts = await getPosts();
-                setPosts(fetchedPosts);
-            } catch (error) {
-                console.error("Failed to load posts:", error);
-                // Optionally show an error to the user
-            } finally {
-                setIsLoadingData(false);
-            }
-        };
-        loadInitialData();
-    }, []);
-
+    const [isAutoplayEnabled, setIsAutoplayEnabled] = useState<boolean>(() => localStorage.getItem('autoplayEnabled') !== 'false');
 
     useEffect(() => {
         const root = window.document.documentElement;
@@ -99,6 +82,10 @@ const App: React.FC = () => {
         root.style.setProperty('--gradient-start-dark', themeColors.dark.start);
         root.style.setProperty('--gradient-end-dark', themeColors.dark.end);
     }, [themeColors]);
+    
+    useEffect(() => {
+        localStorage.setItem('autoplayEnabled', String(isAutoplayEnabled));
+    }, [isAutoplayEnabled]);
 
     const toggleTheme = () => {
         setTheme(theme === 'light' ? 'dark' : 'light');
@@ -127,17 +114,11 @@ const App: React.FC = () => {
         setView('edit');
     };
 
-    const handleDeletePost = async (id: string) => {
+    const handleDeletePost = (id: string) => {
         if (window.confirm('Are you sure you want to delete this post?')) {
-            try {
-                await deletePost(id);
-                setPosts(posts.filter(p => p.id !== id));
-                setView('list');
-                setSelectedPostId(null);
-            } catch (error) {
-                console.error("Failed to delete post:", error);
-                alert("An error occurred while deleting the post. Please try again.");
-            }
+            setPosts(posts.filter(p => p.id !== id));
+            setView('list');
+            setSelectedPostId(null);
         }
     };
 
@@ -165,56 +146,52 @@ const App: React.FC = () => {
         setView('list');
     };
 
-    const handleSavePost = async (postData: { title: string; content: string; hashtags: string[]; imageUrl?: string; audioUrl?: string }, id?: string) => {
-        try {
-            if (id) { // Editing existing post
-                const updatedPost = await updatePost(id, postData);
-                setPosts(posts.map(p => p.id === id ? { ...p, ...updatedPost } : p));
-                setView('post');
-                setSelectedPostId(id);
-            } else { // Creating new post
-                const newPost: BlogPost = {
-                    id: new Date().toISOString(),
-                    author: authorName,
-                    date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-                    ...postData,
-                    comments: [],
-                };
-                const createdPost = await createPost(newPost);
-                setPosts([createdPost, ...posts]);
-                setView('post');
-                setSelectedPostId(createdPost.id);
-            }
-        } catch (error) {
-            console.error("Failed to save post:", error);
-            alert("An error occurred while saving the post. Please try again.");
+    const handleSavePost = (postData: { title: string; content: string; hashtags: string[]; imageUrl?: string; audioUrl?: string }, id?: string) => {
+        if (id) { // Editing existing post
+            const updatedPosts = posts.map(p => p.id === id ? { ...p, ...postData } : p);
+            setPosts(updatedPosts);
+            setView('post');
+            setSelectedPostId(id);
+        } else { // Creating new post
+            const newPost: BlogPost = {
+                id: new Date().toISOString(),
+                author: authorName,
+                date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+                ...postData,
+                comments: [],
+            };
+            const updatedPosts = [newPost, ...posts];
+            setPosts(updatedPosts);
+            setView('post');
+            setSelectedPostId(newPost.id);
         }
     };
     
-    const handleAddComment = async (postId: string, commentData: { author: string; content: string }) => {
-        try {
-            const newComment: Comment = {
-                id: new Date().toISOString(),
-                date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                ...commentData,
-            };
-            const updatedPost = await addComment(postId, newComment);
-            setPosts(posts.map(post => post.id === postId ? updatedPost : post));
-        } catch (error) {
-            console.error("Failed to add comment:", error);
-            alert("An error occurred while adding the comment. Please try again.");
-        }
+    const handleAddComment = (postId: string, commentData: { author: string; content: string }) => {
+        const newComment: Comment = {
+            id: new Date().toISOString(),
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            ...commentData,
+        };
+        const updatedPosts = posts.map(post => {
+            if (post.id === postId) {
+                const existingComments = post.comments || [];
+                return { ...post, comments: [...existingComments, newComment] };
+            }
+            return post;
+        });
+        setPosts(updatedPosts);
     };
 
-    const handleDeleteComment = async (postId: string, commentId: string) => {
+    const handleDeleteComment = (postId: string, commentId: string) => {
         if (!window.confirm('Are you sure you want to delete this comment?')) return;
-        try {
-            const updatedPost = await deleteComment(postId, commentId);
-            setPosts(posts.map(post => post.id === postId ? updatedPost : post));
-        } catch (error) {
-            console.error("Failed to delete comment:", error);
-            alert("An error occurred while deleting the comment. Please try again.");
-        }
+        const updatedPosts = posts.map(post => {
+            if (post.id === postId) {
+                return { ...post, comments: post.comments.filter(c => c.id !== commentId) };
+            }
+            return post;
+        });
+        setPosts(updatedPosts);
     };
     
     const displayedPosts = useMemo(() => {
@@ -238,13 +215,6 @@ const App: React.FC = () => {
     const currentPost = posts.find(p => p.id === selectedPostId);
 
     const renderMainContent = () => {
-        if (isLoadingData) {
-            return (
-                <div className="flex justify-center items-center h-full glass-card p-8">
-                     <h2 className="text-2xl font-serif text-gradient animate-pulse">Loading posts from the database...</h2>
-                </div>
-            )
-        }
         switch (view) {
             case 'create':
                 return <BlogEditor onSave={handleSavePost} onCancel={handleCancelCreate} />;
@@ -252,7 +222,7 @@ const App: React.FC = () => {
                  return <BlogEditor onSave={handleSavePost} onCancel={() => handleSelectPost(selectedPostId!)} postToEdit={currentPost} />;
             case 'post':
                 if (currentPost) {
-                    return <BlogPostView post={currentPost} onSelectTag={handleSelectTag} isAuthenticated={isAuthenticated} onEdit={handleEditPost} onDelete={handleDeletePost} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
+                    return <BlogPostView post={currentPost} onSelectTag={handleSelectTag} isAuthenticated={isAuthenticated} onEdit={handleEditPost} onDelete={handleDeletePost} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} isAutoplayEnabled={isAutoplayEnabled} />;
                 }
                 return <p>Post not found.</p>;
             case 'about':
@@ -263,7 +233,7 @@ const App: React.FC = () => {
                     <div className="space-y-8">
                         {displayedPosts.length > 0 ? (
                             displayedPosts.map(post => (
-                                <BlogPostView key={post.id} post={post} onSelectTag={handleSelectTag} isAuthenticated={isAuthenticated} onEdit={handleEditPost} onDelete={handleDeletePost} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />
+                                <BlogPostView key={post.id} post={post} onSelectTag={handleSelectTag} isAuthenticated={isAuthenticated} onEdit={handleEditPost} onDelete={handleDeletePost} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} isAutoplayEnabled={isAutoplayEnabled}/>
                             ))
                         ) : (
                              <div className="text-center py-16 glass-card">
@@ -310,6 +280,9 @@ const App: React.FC = () => {
                     setCredentials={setCredentials}
                     themeColors={themeColors}
                     setThemeColors={setThemeColors}
+                    isAuthenticated={isAuthenticated}
+                    isAutoplayEnabled={isAutoplayEnabled}
+                    toggleAutoplay={() => setIsAutoplayEnabled(prev => !prev)}
                 />
             )}
             <Sidebar 
