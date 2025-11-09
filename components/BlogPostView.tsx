@@ -39,9 +39,7 @@ const BlogPostView: React.FC<BlogPostViewProps> = ({ post, onSelectTag, isAuthen
             )}
 
             {post.audioUrl && (
-                <div className="my-6">
-                    <AudioPlayer src={post.audioUrl} />
-                </div>
+                <AudioPlayer src={post.audioUrl} />
             )}
             
             <div className="prose prose-lg max-w-none text-gradient leading-relaxed dark:prose-invert" dangerouslySetInnerHTML={{ __html: post.content.replace(/\n/g, '<br />') }} />

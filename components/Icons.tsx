@@ -135,3 +135,15 @@ export const SpellcheckIcon = ({ className = "w-5 h-5" }: { className?: string }
     <path d="M3.5 12.5a8.5 8.5 0 1 1 2.8 5.7" />
   </svg>
 );
+
+export const PlayIcon = ({ className = 'w-6 h-6' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path d="M8 5v14l11-7z" />
+  </svg>
+);
+
+export const PauseIcon = ({ className = 'w-6 h-6' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+  </svg>
+);

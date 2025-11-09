@@ -26,7 +26,7 @@ const App: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!sessionStorage.getItem('isAuthenticated'));
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-    const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+    const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
     
     const [blogTitle, setBlogTitle] = useState<string>(localStorage.getItem('blogTitle') || 'Vignettes');
     const [authorName, setAuthorName] = useState<string>(localStorage.getItem('authorName') || 'Author');
@@ -228,7 +228,7 @@ const App: React.FC = () => {
                     <div className="space-y-8">
                         {displayedPosts.length > 0 ? (
                             displayedPosts.map(post => (
-                                <BlogPostView key={post.id} post={post} onSelectTag={handleSelectTag} isAuthenticated={isAuthenticated} onEdit={handleEditPost} onDelete={handleDeletePost} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment}/>
+                                <BlogPostView key={post.id} post={post} onSelectTag={handleSelectTag} isAuthenticated={isAuthenticated} onEdit={handleEditPost} onDelete={handleDeletePost} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />
                             ))
                         ) : (
                              <div className="text-center py-16 glass-card">
@@ -262,9 +262,9 @@ const App: React.FC = () => {
                     blogTitle={blogTitle}
                 />
              )}
-             {isAdminPanelOpen && (
+             {isSettingsPanelOpen && (
                 <AdminPanel
-                    onClose={() => setIsAdminPanelOpen(false)}
+                    onClose={() => setIsSettingsPanelOpen(false)}
                     blogTitle={blogTitle}
                     setBlogTitle={setBlogTitle}
                     authorName={authorName}
@@ -284,7 +284,7 @@ const App: React.FC = () => {
                 onSelectPost={handleSelectPost}
                 onSelectTag={handleSelectTag}
                 onCreateNew={handleCreateNew}
-                onOpenSettings={() => setIsAdminPanelOpen(true)}
+                onOpenSettings={() => setIsSettingsPanelOpen(true)}
                 onShowAbout={handleShowAbout}
                 onLoginClick={() => setIsLoginModalOpen(true)}
                 selectedTag={selectedTag}

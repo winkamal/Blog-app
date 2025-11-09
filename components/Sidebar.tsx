@@ -24,13 +24,13 @@ interface SidebarProps {
 const ThemeToggle: React.FC<{ theme: 'light' | 'dark', toggleTheme: () => void, onOpenSettings: () => void, isAuthenticated: boolean }> = ({ theme, toggleTheme, onOpenSettings, isAuthenticated }) => (
     <div className="flex items-center gap-2 p-1 rounded-full bg-white/20 dark:bg-black/20">
          {isAuthenticated && (
-             <button
+            <button
                 onClick={onOpenSettings}
                 className="p-2 rounded-full text-gray-700 dark:text-gray-300 hover:bg-white/40 dark:hover:bg-black/40 transition-colors"
                 aria-label="Open Settings"
-             >
+            >
                 <SettingsIcon className="w-5 h-5" />
-             </button>
+            </button>
          )}
         <button
             onClick={toggleTheme}
