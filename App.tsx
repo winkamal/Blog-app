@@ -8,6 +8,7 @@ import AdminPanel from './components/AdminPanel';
 import { useMockData } from './hooks/useMockData';
 import Chatbot from './components/Chatbot';
 import AboutMeView from './components/AboutMeView';
+import BlogPostCard from './components/BlogPostCard';
 
 type View = 'list' | 'post' | 'create' | 'edit' | 'about';
 type Theme = 'light' | 'dark';
@@ -18,7 +19,7 @@ interface ThemeColors {
 }
 
 const App: React.FC = () => {
-    const { posts, setPosts } = useMockData();
+    const { posts, setPosts, isLoading, error } = useMockData();
     const [view, setView] = useState<View>('list');
     const [previousView, setPreviousView] = useState<View>('list');
     const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
@@ -215,6 +216,27 @@ const App: React.FC = () => {
     const currentPost = posts.find(p => p.id === selectedPostId);
 
     const renderMainContent = () => {
+        if (isLoading) {
+            return (
+                <div className="flex items-center justify-center h-full glass-card">
+                    <div className="text-center p-16">
+                        <h2 className="text-2xl font-serif text-gradient animate-pulse">Loading Vignettes...</h2>
+                    </div>
+                </div>
+            );
+        }
+
+        if (error) {
+            return (
+                <div className="flex items-center justify-center h-full glass-card">
+                    <div className="text-center p-16">
+                        <h2 className="text-2xl font-serif text-gradient">Could not load posts.</h2>
+                        <p className="text-gradient opacity-70 mt-2">Please check your connection and try again.</p>
+                    </div>
+                </div>
+            );
+        }
+        
         switch (view) {
             case 'create':
                 return <BlogEditor onSave={handleSavePost} onCancel={handleCancelCreate} />;
@@ -233,7 +255,7 @@ const App: React.FC = () => {
                     <div className="space-y-8">
                         {displayedPosts.length > 0 ? (
                             displayedPosts.map(post => (
-                                <BlogPostView key={post.id} post={post} onSelectTag={handleSelectTag} isAuthenticated={isAuthenticated} onEdit={handleEditPost} onDelete={handleDeletePost} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} isAutoplayEnabled={isAutoplayEnabled}/>
+                                <BlogPostCard key={post.id} post={post} onSelectPost={handleSelectPost} />
                             ))
                         ) : (
                              <div className="text-center py-16 glass-card">
