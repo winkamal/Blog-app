@@ -1,11 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { BlogPost, Comment } from './types';
 import Sidebar from './components/Sidebar';
 import BlogPostView from './components/BlogPostView';
 import BlogEditor from './components/BlogEditor';
 import Login, { Credentials } from './components/Login';
 import AdminPanel from './components/AdminPanel';
-import { getPosts, savePosts } from './services/blogService';
+import * as vercelService from './services/vercelService';
 import Chatbot from './components/Chatbot';
 import AboutMeView from './components/AboutMeView';
 
@@ -18,8 +18,12 @@ interface ThemeColors {
 }
 
 const App: React.FC = () => {
-    const [posts, setPosts] = useState<BlogPost[]>([]);
+    const [allPosts, setAllPosts] = useState<BlogPost[]>([]); // For search/tags
+    const [displayedPosts, setDisplayedPosts] = useState<BlogPost[]>([]); // For pagination
+    const [nextCursor, setNextCursor] = useState<number | null>(0);
     const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+    const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+    
     const [view, setView] = useState<View>('list');
     const [previousView, setPreviousView] = useState<View>('list');
     const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
@@ -49,29 +53,40 @@ const App: React.FC = () => {
         };
     });
     
-    useEffect(() => {
-        const loadInitialData = async () => {
-            setIsLoadingData(true);
-            const fetchedPosts = await getPosts();
-            setPosts(fetchedPosts);
+    const loadInitialData = useCallback(async () => {
+        setIsLoadingData(true);
+        try {
+            const [{ posts, nextCursor }, all] = await Promise.all([
+                vercelService.getPosts(0),
+                vercelService.getAllPosts() // For tags and search
+            ]);
+            setDisplayedPosts(posts);
+            setNextCursor(nextCursor);
+            setAllPosts(all);
+        } catch (error) {
+            console.error("Failed to load initial data:", error);
+        } finally {
             setIsLoadingData(false);
-        };
-        loadInitialData();
+        }
     }, []);
 
-    const handlePostsUpdate = async (newPosts: BlogPost[] | ((prev: BlogPost[]) => BlogPost[])) => {
-        const updatedPosts = typeof newPosts === 'function' ? newPosts(posts) : newPosts;
-        // Optimistically update the UI for a snappy user experience
-        setPosts(updatedPosts);
+    useEffect(() => {
+        loadInitialData();
+    }, [loadInitialData]);
+
+    const handleLoadMore = async () => {
+        if (nextCursor === null || isLoadingMore) return;
+        setIsLoadingMore(true);
         try {
-            // Persist the changes to the remote server
-            await savePosts(updatedPosts);
+            const { posts: newPosts, nextCursor: newNextCursor } = await vercelService.getPosts(nextCursor);
+            setDisplayedPosts(prev => [...prev, ...newPosts]);
+            setNextCursor(newNextCursor);
         } catch (error) {
-            console.error("Failed to save posts to the server.", error);
-            // In a real app, you might show an error notification to the user here.
+            console.error("Failed to load more posts:", error);
+        } finally {
+            setIsLoadingMore(false);
         }
     };
-
 
     useEffect(() => {
         const root = window.document.documentElement;
@@ -134,11 +149,18 @@ const App: React.FC = () => {
         setView('edit');
     };
 
-    const handleDeletePost = (id: string) => {
+    const handleDeletePost = async (id: string) => {
         if (window.confirm('Are you sure you want to delete this post?')) {
-            handlePostsUpdate(posts.filter(p => p.id !== id));
-            setView('list');
-            setSelectedPostId(null);
+            try {
+                await vercelService.deletePost(id);
+                // Refresh data from server to ensure consistency
+                await loadInitialData();
+                setView('list');
+                setSelectedPostId(null);
+            } catch (error) {
+                console.error("Failed to delete post:", error);
+                alert("Could not delete post. Please try again.");
+            }
         }
     };
 
@@ -166,73 +188,75 @@ const App: React.FC = () => {
         setView('list');
     };
 
-    const handleSavePost = (postData: { title: string; content: string; hashtags: string[]; imageUrl?: string; audioUrl?: string }, id?: string) => {
-        if (id) { // Editing existing post
-            const updatedPosts = posts.map(p => p.id === id ? { ...p, ...postData } : p);
-            handlePostsUpdate(updatedPosts);
+    const handleSavePost = async (postData: Omit<BlogPost, 'id'|'author'|'date'|'comments'>, id?: string) => {
+        try {
+            const savedPost = await vercelService.savePost(postData, id);
+            await loadInitialData(); // Refresh all data for consistency
             setView('post');
-            setSelectedPostId(id);
-        } else { // Creating new post
-            const newPost: BlogPost = {
-                id: new Date().toISOString(),
-                author: authorName,
-                date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-                ...postData,
-                comments: [],
-            };
-            const updatedPosts = [newPost, ...posts];
-            handlePostsUpdate(updatedPosts);
-            setView('post');
-            setSelectedPostId(newPost.id);
+            setSelectedPostId(savedPost.id);
+        } catch(error) {
+            console.error("Failed to save post:", error);
+            alert("Could not save the post. Please try again.");
         }
     };
     
-    const handleAddComment = (postId: string, commentData: { author: string; content: string }) => {
+    const handleAddComment = async (postId: string, commentData: { author: string; content: string }) => {
+        const post = allPosts.find(p => p.id === postId);
+        if (!post) return;
+
         const newComment: Comment = {
             id: new Date().toISOString(),
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             ...commentData,
         };
-        const updatedPosts = posts.map(post => {
-            if (post.id === postId) {
-                const existingComments = post.comments || [];
-                return { ...post, comments: [...existingComments, newComment] };
-            }
-            return post;
-        });
-        handlePostsUpdate(updatedPosts);
+        const updatedComments = [...(post.comments || []), newComment];
+        
+        try {
+            await vercelService.updateComments(postId, updatedComments);
+            await loadInitialData(); // Easiest way to refresh state
+        } catch (error) {
+            console.error("Failed to add comment:", error);
+            alert("Could not post comment. Please try again.");
+        }
     };
 
-    const handleDeleteComment = (postId: string, commentId: string) => {
+    const handleDeleteComment = async (postId: string, commentId: string) => {
         if (!window.confirm('Are you sure you want to delete this comment?')) return;
-        const updatedPosts = posts.map(post => {
-            if (post.id === postId) {
-                return { ...post, comments: post.comments.filter(c => c.id !== commentId) };
-            }
-            return post;
-        });
-        handlePostsUpdate(updatedPosts);
+        const post = allPosts.find(p => p.id === postId);
+        if (!post) return;
+
+        const updatedComments = post.comments.filter(c => c.id !== commentId);
+
+        try {
+            await vercelService.updateComments(postId, updatedComments);
+            await loadInitialData(); // Easiest way to refresh state
+        } catch (error) {
+            console.error("Failed to delete comment:", error);
+            alert("Could not delete comment. Please try again.");
+        }
     };
     
-    const displayedPosts = useMemo(() => {
-        let filteredPosts = posts;
+    const filteredPosts = useMemo(() => {
+        // Filtering is now done on `allPosts` and view is controlled separately
+        let postsToFilter = allPosts;
 
         if (selectedTag) {
-            filteredPosts = filteredPosts.filter(post => post.hashtags.includes(selectedTag));
+            return postsToFilter.filter(post => post.hashtags.includes(selectedTag));
         }
 
         if (searchQuery.trim() !== '') {
             const lowercasedQuery = searchQuery.toLowerCase();
-            filteredPosts = filteredPosts.filter(post => 
+            return postsToFilter.filter(post => 
                 post.title.toLowerCase().includes(lowercasedQuery) || 
                 post.content.toLowerCase().includes(lowercasedQuery)
             );
         }
 
-        return filteredPosts;
-    }, [posts, selectedTag, searchQuery]);
+        // If no filter, return paginated posts
+        return displayedPosts;
+    }, [allPosts, selectedTag, searchQuery, displayedPosts]);
 
-    const currentPost = posts.find(p => p.id === selectedPostId);
+    const currentPost = allPosts.find(p => p.id === selectedPostId);
 
     const renderMainContent = () => {
         if (isLoadingData) {
@@ -251,15 +275,18 @@ const App: React.FC = () => {
                 if (currentPost) {
                     return <BlogPostView post={currentPost} onSelectTag={handleSelectTag} isAuthenticated={isAuthenticated} onEdit={handleEditPost} onDelete={handleDeletePost} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
                 }
-                return <p>Post not found.</p>;
+                setView('list'); // If post not found, go back to list
+                return null;
             case 'about':
                 return <AboutMeView content={aboutMeContent} onBack={handleBack} />;
             case 'list':
             default:
+                const postsToRender = selectedTag || searchQuery ? filteredPosts : displayedPosts;
+                const showLoadMore = !selectedTag && !searchQuery && nextCursor !== null;
                 return (
                     <div className="space-y-8">
-                        {displayedPosts.length > 0 ? (
-                            displayedPosts.map(post => (
+                        {postsToRender.length > 0 ? (
+                            postsToRender.map(post => (
                                 <BlogPostView key={post.id} post={post} onSelectTag={handleSelectTag} isAuthenticated={isAuthenticated} onEdit={handleEditPost} onDelete={handleDeletePost} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />
                             ))
                         ) : (
@@ -272,10 +299,25 @@ const App: React.FC = () => {
                                  </p>
                              </div>
                         )}
+                        {showLoadMore && (
+                            <div className="text-center">
+                                <button
+                                    onClick={handleLoadMore}
+                                    disabled={isLoadingMore}
+                                    className="px-6 py-3 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:bg-gray-400 dark:disabled:bg-gray-600 transition"
+                                >
+                                    {isLoadingMore ? 'Loading...' : 'Load More Posts'}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 );
         }
     };
+    
+    const sidebarIndexPosts = useMemo(() => {
+        return allPosts.slice(0, 10); // Show latest 10 posts in sidebar index for performance
+    }, [allPosts]);
 
     return (
         <div className="flex flex-col md:flex-row min-h-screen">
@@ -310,8 +352,8 @@ const App: React.FC = () => {
                 />
             )}
             <Sidebar 
-                indexPosts={displayedPosts}
-                allPosts={posts}
+                indexPosts={sidebarIndexPosts}
+                allPosts={allPosts}
                 blogTitle={blogTitle}
                 onSelectPost={handleSelectPost}
                 onSelectTag={handleSelectTag}
@@ -330,7 +372,7 @@ const App: React.FC = () => {
             <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-y-auto">
                 {renderMainContent()}
             </main>
-            <Chatbot posts={posts} blogTitle={blogTitle} />
+            <Chatbot posts={allPosts} blogTitle={blogTitle} />
         </div>
     );
 };

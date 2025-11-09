@@ -1,6 +1,5 @@
 import React from 'react';
 import { BlogPost } from '../types';
-import AudioPlayer from './AudioPlayer';
 import CommentSection from './CommentSection';
 import { EditIcon, TrashIcon } from './Icons';
 
@@ -29,17 +28,13 @@ const BlogPostView: React.FC<BlogPostViewProps> = ({ post, onSelectTag, isAuthen
             )}
             <header className="mb-4">
                 <h1 className="text-4xl md:text-5xl font-serif font-bold text-gradient mb-2">{post.title}</h1>
-                <p className="text-sm text-gradient opacity-70">By {post.author} on {post.date}</p>
+                <p className="text-sm text-gradient opacity-70">By {post.author} on {new Date(post.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
             </header>
 
             {post.imageUrl && (
-                <div className="my-6 rounded-lg overflow-hidden">
+                <div className="my-6 rounded-2xl overflow-hidden shadow-lg">
                     <img src={post.imageUrl} alt={post.title} className="w-full h-auto object-cover" />
                 </div>
-            )}
-
-            {post.audioUrl && (
-                <AudioPlayer src={post.audioUrl} />
             )}
             
             <div className="prose prose-lg max-w-none text-gradient leading-relaxed dark:prose-invert" dangerouslySetInnerHTML={{ __html: post.content.replace(/\n/g, '<br />') }} />

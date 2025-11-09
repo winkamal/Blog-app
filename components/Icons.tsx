@@ -7,14 +7,6 @@ export const PlusIcon = ({ className = 'w-6 h-6' }: { className?: string }) => (
   </svg>
 );
 
-export const MusicIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <path d="M9 18V5l12-2v13"></path>
-        <circle cx="6" cy="18" r="3"></circle>
-        <circle cx="18" cy="16" r="3"></circle>
-    </svg>
-);
-
 export const ImageIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -24,7 +16,7 @@ export const ImageIcon = ({ className = 'w-5 h-5' }: { className?: string }) => 
 );
 
 export const SparklesIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg xmlns="http://www.w.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="m12 3-1.9 4.8-4.8 1.9 4.8 1.9 1.9 4.8 1.9-4.8 4.8-1.9-4.8-1.9Z"/>
     <path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z"/>
   </svg>
@@ -133,17 +125,5 @@ export const SpellcheckIcon = ({ className = "w-5 h-5" }: { className?: string }
   >
     <polyline points="20 6 9 17 4 12"></polyline>
     <path d="M3.5 12.5a8.5 8.5 0 1 1 2.8 5.7" />
-  </svg>
-);
-
-export const PlayIcon = ({ className = 'w-6 h-6' }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
-    <path d="M8 5v14l11-7z" />
-  </svg>
-);
-
-export const PauseIcon = ({ className = 'w-6 h-6' }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
-    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
   </svg>
 );

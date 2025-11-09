@@ -13,7 +13,6 @@ export interface BlogPost {
   date: string;
   content: string;
   imageUrl?: string;
-  audioUrl?: string;
   hashtags: string[];
   comments: Comment[];
 }
