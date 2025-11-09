@@ -7,8 +7,9 @@ import Login, { Credentials } from './components/Login';
 import AdminPanel from './components/AdminPanel';
 import { useMockData } from './hooks/useMockData';
 import Chatbot from './components/Chatbot';
+import AboutMeView from './components/AboutMeView';
 
-type View = 'list' | 'post' | 'create' | 'edit';
+type View = 'list' | 'post' | 'create' | 'edit' | 'about';
 type Theme = 'light' | 'dark';
 
 interface ThemeColors {
@@ -19,14 +20,19 @@ interface ThemeColors {
 const App: React.FC = () => {
     const { posts, setPosts } = useMockData();
     const [view, setView] = useState<View>('list');
+    const [previousView, setPreviousView] = useState<View>('list');
     const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
     const [selectedTag, setSelectedTag] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!sessionStorage.getItem('isAuthenticated'));
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
     const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
     
     const [blogTitle, setBlogTitle] = useState<string>(localStorage.getItem('blogTitle') || 'Vignettes');
     const [authorName, setAuthorName] = useState<string>(localStorage.getItem('authorName') || 'Author');
+    const [aboutMeContent, setAboutMeContent] = useState<string>(
+        localStorage.getItem('aboutMeContent') || 'This is a blog about everyday life moments. Welcome! Tell your readers more about yourself here.'
+    );
     const [credentials, setCredentials] = useState<Credentials>({
         username: localStorage.getItem('blogUsername') || 'admin',
         password: localStorage.getItem('blogPassword') || 'testaccount',
@@ -59,6 +65,10 @@ const App: React.FC = () => {
     }, [authorName]);
 
     useEffect(() => {
+        localStorage.setItem('aboutMeContent', aboutMeContent);
+    }, [aboutMeContent]);
+
+    useEffect(() => {
         localStorage.setItem('blogUsername', credentials.username);
         localStorage.setItem('blogPassword', credentials.password);
     }, [credentials]);
@@ -89,11 +99,13 @@ const App: React.FC = () => {
 
     const handleSelectPost = (id: string) => {
         setSelectedPostId(id);
+        setPreviousView(view);
         setView('post');
     };
     
     const handleEditPost = (id: string) => {
         setSelectedPostId(id);
+        setPreviousView('post');
         setView('edit');
     };
 
@@ -114,6 +126,15 @@ const App: React.FC = () => {
     const handleCreateNew = () => {
         setView('create');
         setSelectedPostId(null);
+    };
+
+    const handleShowAbout = () => {
+        setPreviousView(view === 'about' ? 'list' : view);
+        setView('about');
+    };
+
+    const handleBack = () => {
+        setView(previousView);
     };
 
     const handleCancelCreate = () => {
@@ -169,11 +190,22 @@ const App: React.FC = () => {
     };
     
     const displayedPosts = useMemo(() => {
-        if (!selectedTag) {
-            return posts;
+        let filteredPosts = posts;
+
+        if (selectedTag) {
+            filteredPosts = filteredPosts.filter(post => post.hashtags.includes(selectedTag));
         }
-        return posts.filter(post => post.hashtags.includes(selectedTag));
-    }, [posts, selectedTag]);
+
+        if (searchQuery.trim() !== '') {
+            const lowercasedQuery = searchQuery.toLowerCase();
+            filteredPosts = filteredPosts.filter(post => 
+                post.title.toLowerCase().includes(lowercasedQuery) || 
+                post.content.toLowerCase().includes(lowercasedQuery)
+            );
+        }
+
+        return filteredPosts;
+    }, [posts, selectedTag, searchQuery]);
 
     const currentPost = posts.find(p => p.id === selectedPostId);
 
@@ -182,12 +214,14 @@ const App: React.FC = () => {
             case 'create':
                 return <BlogEditor onSave={handleSavePost} onCancel={handleCancelCreate} />;
             case 'edit':
-                 return <BlogEditor onSave={handleSavePost} onCancel={handleCancelCreate} postToEdit={currentPost} />;
+                 return <BlogEditor onSave={handleSavePost} onCancel={() => handleSelectPost(selectedPostId!)} postToEdit={currentPost} />;
             case 'post':
                 if (currentPost) {
                     return <BlogPostView post={currentPost} onSelectTag={handleSelectTag} isAuthenticated={isAuthenticated} onEdit={handleEditPost} onDelete={handleDeletePost} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
                 }
                 return <p>Post not found.</p>;
+            case 'about':
+                return <AboutMeView content={aboutMeContent} onBack={handleBack} />;
             case 'list':
             default:
                 return (
@@ -199,10 +233,10 @@ const App: React.FC = () => {
                         ) : (
                              <div className="text-center py-16 glass-card">
                                  <h2 className="text-2xl font-serif text-gradient">
-                                    {selectedTag ? `No posts found for "${selectedTag}"` : "No posts yet. Time to write!"}
+                                    {searchQuery ? `No posts found for "${searchQuery}"` : selectedTag ? `No posts found for "${selectedTag}"` : "No posts yet. Time to write!"}
                                  </h2>
                                  <p className="text-gradient opacity-70 mt-2">
-                                     {selectedTag ? "Try selecting another hashtag or viewing all posts." : "Click 'New Post' to get started."}
+                                     {selectedTag || searchQuery ? "Try a different search or select another hashtag." : "Click 'New Post' to get started."}
                                  </p>
                              </div>
                         )}
@@ -235,6 +269,8 @@ const App: React.FC = () => {
                     setBlogTitle={setBlogTitle}
                     authorName={authorName}
                     setAuthorName={setAuthorName}
+                    aboutMeContent={aboutMeContent}
+                    setAboutMeContent={setAboutMeContent}
                     credentials={credentials}
                     setCredentials={setCredentials}
                     themeColors={themeColors}
@@ -242,18 +278,22 @@ const App: React.FC = () => {
                 />
             )}
             <Sidebar 
-                posts={posts}
+                indexPosts={displayedPosts}
+                allPosts={posts}
                 blogTitle={blogTitle}
                 onSelectPost={handleSelectPost}
                 onSelectTag={handleSelectTag}
                 onCreateNew={handleCreateNew}
                 onOpenSettings={() => setIsAdminPanelOpen(true)}
+                onShowAbout={handleShowAbout}
                 onLoginClick={() => setIsLoginModalOpen(true)}
                 selectedTag={selectedTag}
                 isAuthenticated={isAuthenticated}
                 onLogout={handleLogout}
                 theme={theme}
                 toggleTheme={toggleTheme}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
             />
             <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-y-auto">
                 {renderMainContent()}

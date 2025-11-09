@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BlogPost } from '../types';
-import { generateHashtags } from '../services/geminiService';
-import { SparklesIcon } from './Icons';
+import { generateHashtags, checkSpellingAndGrammar } from '../services/geminiService';
+import { SparklesIcon, SpellcheckIcon } from './Icons';
 
 interface BlogEditorProps {
     onSave: (postData: { title: string; content: string; hashtags: string[]; imageUrl?: string; audioUrl?: string }, id?: string) => void;
@@ -24,6 +24,7 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ onSave, onCancel, postToEdit })
     const [imagePreview, setImagePreview] = useState<string | undefined>();
     const [audioPreview, setAudioPreview] = useState<string | undefined>();
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isCheckingSpelling, setIsCheckingSpelling] = useState(false);
 
     useEffect(() => {
         if (postToEdit) {
@@ -63,6 +64,23 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ onSave, onCancel, postToEdit })
         }
     };
 
+    const handleSpellcheck = async () => {
+        if (!content.trim()) {
+            alert("Please write some content before checking.");
+            return;
+        }
+        setIsCheckingSpelling(true);
+        try {
+            const correctedText = await checkSpellingAndGrammar(content);
+            setContent(correctedText);
+        } catch (error) {
+            console.error("Failed to check spelling", error);
+            alert("Could not check spelling and grammar at this time.");
+        } finally {
+            setIsCheckingSpelling(false);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const postData = {
@@ -86,7 +104,20 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ onSave, onCancel, postToEdit })
                 <div>
                     <label htmlFor="content" className="block text-sm font-medium text-gradient">Content</label>
                     <SolidTextarea id="content" value={content} onChange={(e) => setContent(e.target.value)} rows={10} required />
+                    <div className="flex items-center justify-end gap-2 mt-2">
+                        <button type="button" onClick={handleSpellcheck} disabled={isCheckingSpelling || !content.trim()} className="flex items-center justify-center gap-2 px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 dark:disabled:bg-gray-600 transition">
+                            {isCheckingSpelling ? (
+                                'Checking...'
+                            ) : (
+                                <>
+                                    <SpellcheckIcon className="w-5 h-5" />
+                                    <span>Spell Check</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                          <label htmlFor="image" className="block text-sm font-medium text-gradient">Cover Image</label>

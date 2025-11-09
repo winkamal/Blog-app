@@ -12,6 +12,8 @@ interface AdminPanelProps {
     setBlogTitle: (title: string) => void;
     authorName: string;
     setAuthorName: (name: string) => void;
+    aboutMeContent: string;
+    setAboutMeContent: (content: string) => void;
     credentials: Credentials;
     setCredentials: (creds: Credentials) => void;
     themeColors: ThemeColors;
@@ -22,10 +24,15 @@ const SolidInput = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
     <input {...props} className="mt-1 block w-full px-4 py-3 bg-gray-100 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg shadow-sm placeholder-gray-500 dark:placeholder-gray-400 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent transition" />
 );
 
+const SolidTextarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
+    <textarea {...props} className="mt-1 block w-full px-4 py-3 bg-gray-100 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg shadow-sm placeholder-gray-500 dark:placeholder-gray-400 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent transition" />
+);
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, blogTitle, setBlogTitle, authorName, setAuthorName, credentials, setCredentials, themeColors, setThemeColors }) => {
+
+const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, blogTitle, setBlogTitle, authorName, setAuthorName, aboutMeContent, setAboutMeContent, credentials, setCredentials, themeColors, setThemeColors }) => {
     const [newTitle, setNewTitle] = useState(blogTitle);
     const [newAuthorName, setNewAuthorName] = useState(authorName);
+    const [newAboutMe, setNewAboutMe] = useState(aboutMeContent);
     const [newUsername, setNewUsername] = useState(credentials.username);
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -44,6 +51,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, blogTitle, setBlogTitl
         e.preventDefault();
         setAuthorName(newAuthorName);
         setSuccess('Author name updated!');
+        setTimeout(() => setSuccess(''), 3000);
+    };
+
+    const handleAboutMeSave = (e: React.FormEvent) => {
+        e.preventDefault();
+        setAboutMeContent(newAboutMe);
+        setSuccess('About Me section updated!');
         setTimeout(() => setSuccess(''), 3000);
     };
     
@@ -114,7 +128,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, blogTitle, setBlogTitl
                     </div>
                 </form>
 
-                <form onSubmit={handleUsernameSave} className="space-y-3">
+                <form onSubmit={handleAboutMeSave} className="space-y-3 pt-4 border-t border-white/20 dark:border-white/10">
+                    <label htmlFor="aboutMeContent" className="block text-sm font-medium text-gradient">About Me Section</label>
+                    <SolidTextarea id="aboutMeContent" value={newAboutMe} onChange={(e) => setNewAboutMe(e.target.value)} rows={6} />
+                    <div className="text-right">
+                        <button type="submit" className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700">Save About Me</button>
+                    </div>
+                </form>
+
+                <form onSubmit={handleUsernameSave} className="space-y-3 pt-4 border-t border-white/20 dark:border-white/10">
                     <label htmlFor="username" className="block text-sm font-medium text-gradient">Username</label>
                     <div className="flex gap-2">
                         <SolidInput id="username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} />

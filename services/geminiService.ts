@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
 const API_KEY = process.env.API_KEY;
@@ -36,6 +35,32 @@ export const generateHashtags = async (content: string): Promise<string[]> => {
     console.error("Error generating hashtags:", error);
     // Fallback in case of API error
     return ["#error", "#generation_failed"];
+  }
+};
+
+export const checkSpellingAndGrammar = async (content: string): Promise<string> => {
+  if (!API_KEY) {
+    return Promise.reject(new Error("API_KEY is not set. AI features will be disabled."));
+  }
+  
+  try {
+    const prompt = `Please proofread the following text for any spelling and grammar errors. Return only the corrected text. Preserve the original line breaks and any markdown formatting. If the text is already perfect, return it unchanged.
+
+Original Text:
+---
+${content}
+---
+`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+    
+    return response.text;
+  } catch (error) {
+    console.error("Error with spellcheck:", error);
+    throw new Error("Sorry, I encountered an error while checking the text.");
   }
 };
 

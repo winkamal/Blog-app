@@ -1,20 +1,24 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { BlogPost } from '../types';
-import { PlusIcon, SunIcon, MoonIcon, LogoutIcon, SettingsIcon, LoginIcon } from './Icons';
+import { PlusIcon, SunIcon, MoonIcon, LogoutIcon, SettingsIcon, LoginIcon, SearchIcon } from './Icons';
 
 interface SidebarProps {
-    posts: BlogPost[];
+    indexPosts: BlogPost[];
+    allPosts: BlogPost[];
     blogTitle: string;
     onSelectPost: (id: string) => void;
     onSelectTag: (tag: string | null) => void;
     onCreateNew: () => void;
     onOpenSettings: () => void;
     onLoginClick: () => void;
+    onShowAbout: () => void;
     selectedTag: string | null;
     isAuthenticated: boolean;
     onLogout: () => void;
     theme: 'light' | 'dark';
     toggleTheme: () => void;
+    searchQuery: string;
+    onSearchChange: (query: string) => void;
 }
 
 const ThemeToggle: React.FC<{ theme: 'light' | 'dark', toggleTheme: () => void, onOpenSettings: () => void, isAuthenticated: boolean }> = ({ theme, toggleTheme, onOpenSettings, isAuthenticated }) => (
@@ -39,8 +43,8 @@ const ThemeToggle: React.FC<{ theme: 'light' | 'dark', toggleTheme: () => void, 
 );
 
 
-const Sidebar: React.FC<SidebarProps> = ({ posts, blogTitle, onSelectPost, onSelectTag, onCreateNew, onOpenSettings, onLoginClick, selectedTag, isAuthenticated, onLogout, theme, toggleTheme }) => {
-    const allTags = [...new Set(posts.flatMap(p => p.hashtags))].sort();
+const Sidebar: React.FC<SidebarProps> = ({ indexPosts, allPosts, blogTitle, onSelectPost, onSelectTag, onCreateNew, onOpenSettings, onLoginClick, onShowAbout, selectedTag, isAuthenticated, onLogout, theme, toggleTheme, searchQuery, onSearchChange }) => {
+    const allTags = [...new Set(allPosts.flatMap(p => p.hashtags))].sort();
 
     return (
         <aside className="w-full md:w-80 lg:w-96 flex-shrink-0 p-4 md:h-screen md:sticky md:top-0">
@@ -51,6 +55,9 @@ const Sidebar: React.FC<SidebarProps> = ({ posts, blogTitle, onSelectPost, onSel
                     </div>
                     <h1 className="text-4xl font-serif font-bold text-gradient cursor-pointer text-center" onClick={() => onSelectTag(null)}>{blogTitle}</h1>
                     <p className="text-sm text-gradient opacity-70 mt-1">Everyday Life Moments</p>
+                    <button onClick={onShowAbout} className="text-sm text-gradient opacity-80 hover:opacity-100 underline transition-opacity duration-200 mt-2">
+                        About Me
+                    </button>
                 </header>
 
                 {isAuthenticated && (
@@ -60,12 +67,28 @@ const Sidebar: React.FC<SidebarProps> = ({ posts, blogTitle, onSelectPost, onSel
                     </button>
                 )}
 
+                <div className="mb-6">
+                    <div className="relative">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <SearchIcon className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                        </span>
+                        <input
+                            type="text"
+                            placeholder="Search posts..."
+                            value={searchQuery}
+                            onChange={(e) => onSearchChange(e.target.value)}
+                            className="block w-full pl-10 pr-4 py-2 bg-black/10 dark:bg-white/10 border border-transparent rounded-lg text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent transition"
+                            aria-label="Search posts"
+                        />
+                    </div>
+                </div>
+
                 <nav className="flex-grow overflow-y-auto">
                     <section className="mb-8">
                         <h2 className="text-xl font-serif font-bold text-gradient mb-3 border-b border-white/20 dark:border-white/10 pb-2">Index</h2>
-                        {posts.length > 0 ? (
+                        {indexPosts.length > 0 ? (
                             <ul className="space-y-2">
-                                {posts.map(post => (
+                                {indexPosts.map(post => (
                                     <li key={post.id}>
                                         <a href="#" onClick={(e) => { e.preventDefault(); onSelectPost(post.id); }} className="text-gradient opacity-80 hover:opacity-100 transition-opacity duration-200 block text-ellipsis overflow-hidden whitespace-nowrap">
                                             {post.title}
@@ -74,7 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ posts, blogTitle, onSelectPost, onSel
                                 ))}
                             </ul>
                         ) : (
-                            <p className="text-sm text-gradient opacity-70">No posts yet.</p>
+                            <p className="text-sm text-gradient opacity-70">{searchQuery ? 'No matching posts found.' : 'No posts yet.'}</p>
                         )}
                     </section>
 
